@@ -245,31 +245,59 @@ model.to(device)
 train_loader = DataLoaderLite(B = 4, T = 32)
 
 # NEW CODE
-optimizer = torch.optim.AdamW(model.parameters(), lr = 3e-4)
+# Add learning rate scheduler and adjust initial learning rate
+initial_lr = 6e-4  # Slightly higher initial learning rate
+optimizer = torch.optim.AdamW(model.parameters(), lr=initial_lr, weight_decay=0.1)
 
-num_epochs = 25  # Increased to 25 epochs
-batches_per_epoch = len(train_loader.tokens) // (train_loader.B * train_loader.T)
+# Add learning rate scheduler
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+    optimizer,
+    T_max=num_epochs * batches_per_epoch,
+    eta_min=1e-5
+)
 
 print(f"Starting training for {num_epochs} epochs, {batches_per_epoch} batches per epoch")
+best_loss = float('inf')
 
 for epoch in range(num_epochs):
-    epoch_loss = 0.0  # Track average loss per epoch
+    epoch_loss = 0.0
+    model.train()  # Ensure model is in training mode
+    
     for batch in range(batches_per_epoch):
         x, y = train_loader.next_batch()
         x, y = x.to(device), y.to(device)
+        
         optimizer.zero_grad()
         logits, loss = model(x, y)
         loss.backward()
+        
+        # Gradient clipping to prevent exploding gradients
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        
         optimizer.step()
+        scheduler.step()
+        
         epoch_loss += loss.item()
         
-        if batch % 100 == 0:  # Print every 100 batches
-            print(f'epoch {epoch+1}/{num_epochs}, batch {batch}/{batches_per_epoch}, loss: {loss.item():.4f}')
+        if batch % 100 == 0:
+            lr = scheduler.get_last_lr()[0]
+            print(f'epoch {epoch+1}/{num_epochs}, batch {batch}/{batches_per_epoch}, loss: {loss.item():.4f}, lr: {lr:.2e}')
     
     avg_epoch_loss = epoch_loss / batches_per_epoch
     print(f'Epoch {epoch+1}/{num_epochs} completed, average loss: {avg_epoch_loss:.4f}')
+    
+    # Save best model
+    if avg_epoch_loss < best_loss:
+        best_loss = avg_epoch_loss
+        print(f'New best loss: {best_loss:.4f}')
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': best_loss,
+        }, 'best_model.pt')
 
-print(f'Training completed. Final loss: {loss.item():.4f}')
+print(f'Training completed. Best loss: {best_loss:.4f}')
 
 
 print(loss)
