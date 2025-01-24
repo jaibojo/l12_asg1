@@ -246,14 +246,30 @@ train_loader = DataLoaderLite(B = 4, T = 32)
 
 # NEW CODE
 optimizer = torch.optim.AdamW(model.parameters(), lr = 3e-4)
-for i in range(50):
-    x, y = train_loader.next_batch()
-    x, y = x.to(device), y.to(device)
-    optimizer.zero_grad()
-    logits, loss = model(x, y)
-    loss.backward()
-    optimizer.step()
-    print(f'step{i}, loss: {loss.item()}')
+
+num_epochs = 25  # Increased to 25 epochs
+batches_per_epoch = len(train_loader.tokens) // (train_loader.B * train_loader.T)
+
+print(f"Starting training for {num_epochs} epochs, {batches_per_epoch} batches per epoch")
+
+for epoch in range(num_epochs):
+    epoch_loss = 0.0  # Track average loss per epoch
+    for batch in range(batches_per_epoch):
+        x, y = train_loader.next_batch()
+        x, y = x.to(device), y.to(device)
+        optimizer.zero_grad()
+        logits, loss = model(x, y)
+        loss.backward()
+        optimizer.step()
+        epoch_loss += loss.item()
+        
+        if batch % 100 == 0:  # Print every 100 batches
+            print(f'epoch {epoch+1}/{num_epochs}, batch {batch}/{batches_per_epoch}, loss: {loss.item():.4f}')
+    
+    avg_epoch_loss = epoch_loss / batches_per_epoch
+    print(f'Epoch {epoch+1}/{num_epochs} completed, average loss: {avg_epoch_loss:.4f}')
+
+print(f'Training completed. Final loss: {loss.item():.4f}')
 
 
 print(loss)
