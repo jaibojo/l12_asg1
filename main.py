@@ -245,6 +245,10 @@ model.to(device)
 train_loader = DataLoaderLite(B = 4, T = 32)
 
 # NEW CODE
+# Define training parameters
+num_epochs = 25  # Number of epochs
+batches_per_epoch = len(train_loader.tokens) // (train_loader.B * train_loader.T)
+
 # Add learning rate scheduler and adjust initial learning rate
 initial_lr = 6e-4  # Slightly higher initial learning rate
 optimizer = torch.optim.AdamW(model.parameters(), lr=initial_lr, weight_decay=0.1)
